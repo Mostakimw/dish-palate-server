@@ -123,7 +123,7 @@ async function run() {
 
       try {
         const recipe = await recipesCollection.findOne({
-          _id: new ObjectId(id),
+          _id: ObjectId.createFromHexString(id),
         });
         if (!recipe) {
           return res.status(404).json({
@@ -173,6 +173,70 @@ async function run() {
         res.status(500).json({
           success: false,
           message: "An error occurred while coin purchase",
+        });
+      }
+    });
+
+    //! coin update after successful recipe view
+    app.patch("/api/v1/recipe-update", async (req, res) => {
+      console.log(req.body);
+      const { userEmail, recipeId } = req.body;
+
+      try {
+        const user = await usersCollection.findOne({ email: userEmail });
+
+        if (!user) {
+          return res.status(404).json({
+            success: false,
+            message: "User not found",
+          });
+        }
+
+        // fetch recipe details
+        const recipe = await recipesCollection.findOne({
+          _id: ObjectId.createFromHexString(recipeId),
+        });
+        console.log("user", recipe);
+        if (!recipe) {
+          return res.status(404).json({
+            success: false,
+            message: "Recipe not found",
+          });
+        }
+
+        // reduced 10 coin from user's balance
+        await usersCollection.updateOne(
+          { email: userEmail },
+          { $inc: { coin: -10 } }
+        );
+
+        // add 1 coin to the recipe creator
+        await usersCollection.updateOne(
+          { email: recipe.creatorEmail },
+          { $inc: { coin: 1 } }
+        );
+
+        // insert user email into purchased_by array of the recipe
+        await recipesCollection.updateOne(
+          { _id: ObjectId.createFromHexString(recipeId) },
+          { $push: { purchased_by: userEmail } }
+        );
+
+        // increase watchCount of the recipe
+        await recipesCollection.updateOne(
+          { _id: ObjectId.createFromHexString(recipeId) },
+          { $inc: { watchCount: 1 } }
+        );
+
+        res.status(200).json({
+          success: true,
+          message: "Coin updated successfully based on actions",
+        });
+      } catch (error) {
+        res.status(500).json({
+          success: false,
+          message:
+            "An error occurred while updating coin and performing actions",
         });
       }
     });
