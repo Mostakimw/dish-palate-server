@@ -241,6 +241,59 @@ async function run() {
       }
     });
 
+    //! reaction add/remove api
+    app.patch("/api/v1/recipes/:id/reaction", async (req, res) => {
+      const { id } = req.params;
+      const { userEmail } = req.body;
+
+      try {
+        const user = await usersCollection.findOne({ email: userEmail });
+        if (!user) {
+          return res.status(404).json({
+            success: false,
+            message: "User not found",
+          });
+        }
+
+        const recipe = await recipesCollection.findOne({
+          _id: ObjectId.createFromHexString(id),
+        });
+        if (!recipe) {
+          return res.status(404).json({
+            success: false,
+            message: "Recipe not found",
+          });
+        }
+
+        // check if the user has already reacted to this recipe
+        const existingReactionIndex = recipe.reaction.indexOf(userEmail);
+
+        if (existingReactionIndex !== -1) {
+          // removing the reaction if already reacted
+          await recipesCollection.updateOne(
+            { _id: ObjectId.createFromHexString(id) },
+            { $pull: { reaction: userEmail } }
+          );
+        } else {
+          // adding the reaction if user is reacting for the first time
+          await recipesCollection.updateOne(
+            { _id: ObjectId.createFromHexString(id) },
+            { $push: { reaction: userEmail } }
+          );
+        }
+
+        res.status(200).json({
+          success: true,
+          message: "User reaction updated successfully",
+        });
+      } catch (error) {
+        res.status(500).json({
+          success: false,
+          message: "An error occurred while updating user reaction",
+        });
+      }
+    });
+
     // Start the server
     app.listen(port, () => {
       console.log(`Server is running on port ${process.env.PORT}`);
