@@ -1,6 +1,6 @@
 const express = require("express");
 const cors = require("cors");
-const { MongoClient } = require("mongodb");
+const { MongoClient, ObjectId } = require("mongodb");
 require("dotenv").config();
 const jwt = require("jsonwebtoken");
 
@@ -29,7 +29,7 @@ async function run() {
     const recipesCollection = db.collection("recipes");
 
     //! User Registration
-    app.post("/api/v1/register", async (req, res) => {
+    app.post("/api/v1/user", async (req, res) => {
       const { displayName, photoUrl, email, coin } = req.body;
       console.log(req.body);
 
@@ -43,12 +43,29 @@ async function run() {
       }
 
       // Insert user into the database
-      await collection.insertOne({ displayName, photoUrl, email, coin });
+      await usersCollection.insertOne({ displayName, photoUrl, email, coin });
 
       res.status(201).json({
         success: true,
         message: "User registered successfully",
       });
+    });
+
+    //! getting all users
+    app.get("/api/v1/users", async (req, res) => {
+      try {
+        const users = await usersCollection.find().toArray();
+        res.status(200).json({
+          success: true,
+          message: "Users fetched successfully",
+          data: users,
+        });
+      } catch (error) {
+        res.status(500).json({
+          success: false,
+          message: "An error occurred while fetching users",
+        });
+      }
     });
 
     //! recipe create api
@@ -96,6 +113,66 @@ async function run() {
         res.status(500).json({
           success: false,
           message: "An error occurred while fetching recipes",
+        });
+      }
+    });
+
+    //! get single recipe data
+    app.get("/api/v1/recipes/:id", async (req, res) => {
+      const { id } = req.params;
+
+      try {
+        const recipe = await recipesCollection.findOne({
+          _id: new ObjectId(id),
+        });
+        if (!recipe) {
+          return res.status(404).json({
+            success: false,
+            message: "Recipe not found",
+          });
+        }
+
+        res.status(200).json({
+          success: true,
+          message: "Recipe fetched successfully",
+          data: recipe,
+        });
+      } catch (error) {
+        res.status(500).json({
+          success: false,
+          message: "An error occurred while fetching the recipe",
+        });
+      }
+    });
+
+    //! Coin buy endpoint and update coin
+    app.patch("/api/v1/coin", async (req, res) => {
+      console.log(req.body);
+      const { userEmail, boughtCoins } = req.body;
+      console.log(userEmail);
+
+      try {
+        const user = await usersCollection.findOne({ email: userEmail });
+        if (!user) {
+          return res.status(404).json({
+            success: false,
+            message: "User not found",
+          });
+        }
+        // update user's coin balance
+        await usersCollection.updateOne(
+          { email: userEmail },
+          { $inc: { coin: boughtCoins } }
+        );
+
+        res.status(200).json({
+          success: true,
+          message: "Coins purchased successfully",
+        });
+      } catch (error) {
+        res.status(500).json({
+          success: false,
+          message: "An error occurred while coin purchase",
         });
       }
     });
