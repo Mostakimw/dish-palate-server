@@ -11,6 +11,24 @@ const port = process.env.PORT || 5000;
 app.use(cors({ origin: ["http://localhost:5173"], credentials: true }));
 app.use(express.json());
 
+// ! verify jwt
+const verifyJWT = (req, res, next) => {
+  const authorization = req.headers.authorization;
+  if (!authorization) {
+    return res
+      .status(401)
+      .send({ error: true, message: "Unauthorized access" });
+  }
+  const token = authorization.split(" ")[1];
+  jwt.verify(token, process.env.ACCESS_TOKEN, (err, decoded) => {
+    if (err) {
+      return res.status(403).send({ error: true, message: "Forbidden access" });
+    }
+    req.decoded = decoded;
+    next();
+  });
+};
+
 // MongoDB Connection URL
 const uri = process.env.MONGODB_URI;
 const client = new MongoClient(uri, {
@@ -33,7 +51,7 @@ async function run() {
       const { displayName, photoUrl, email, coin } = req.body;
       console.log(req.body);
 
-      // Check if email already exists
+      // check if email already exists
       const existingUser = await usersCollection.findOne({ email });
       if (existingUser) {
         return res.status(400).json({
@@ -42,7 +60,7 @@ async function run() {
         });
       }
 
-      // Insert user into the database
+      // insert user into the database
       await usersCollection.insertOne({ displayName, photoUrl, email, coin });
 
       res.status(201).json({
@@ -50,6 +68,38 @@ async function run() {
         message: "User registered successfully",
       });
     });
+
+    // ! jwt
+    app.post("/api/v1/jwt", async (req, res) => {
+      const body = req.body;
+      console.log(body);
+      const token = jwt.sign(body, process.env.ACCESS_TOKEN, {
+        expiresIn: "1h",
+      });
+      res.send({ token });
+    });
+
+    //! user login
+    // app.post("/api/v1/login", async (req, res) => {
+    //   const { email } = req.body;
+
+    //   // find user by email
+    //   const user = await usersCollection.findOne({ email });
+    //   if (!user) {
+    //     return res.status(401).json({ message: "Invalid email or password" });
+    //   }
+
+    //   // generate JWT token
+    //   // const token = jwt.sign({ email: user.email }, process.env.JWT_SECRET, {
+    //   //   expiresIn: process.env.EXPIRES_IN,
+    //   // });
+
+    //   res.json({
+    //     success: true,
+    //     message: "Login successful",
+    //     token,
+    //   });
+    // });
 
     //! getting all users
     app.get("/api/v1/users", async (req, res) => {
@@ -69,7 +119,7 @@ async function run() {
     });
 
     //! recipe create api
-    app.post("/api/v1/recipe", async (req, res) => {
+    app.post("/api/v1/recipe", verifyJWT, async (req, res) => {
       const data = req.body;
       try {
         const result = await recipesCollection.insertOne(data);
@@ -87,7 +137,7 @@ async function run() {
     });
 
     //! recipe get and filtering and search
-    app.get("/api/v1/recipes", async (req, res) => {
+    app.get("/api/v1/recipes", verifyJWT, async (req, res) => {
       const { category, country, search } = req.query;
       let query = {};
 
@@ -118,7 +168,7 @@ async function run() {
     });
 
     //! get single recipe data
-    app.get("/api/v1/recipes/:id", async (req, res) => {
+    app.get("/api/v1/recipes/:id", verifyJWT, async (req, res) => {
       const { id } = req.params;
 
       try {
@@ -146,7 +196,7 @@ async function run() {
     });
 
     //! Coin buy endpoint and update coin
-    app.patch("/api/v1/coin", async (req, res) => {
+    app.patch("/api/v1/coin", verifyJWT, async (req, res) => {
       console.log(req.body);
       const { userEmail, boughtCoins } = req.body;
       console.log(userEmail);
