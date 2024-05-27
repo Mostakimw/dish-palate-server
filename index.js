@@ -8,7 +8,9 @@ const app = express();
 const port = process.env.PORT || 5000;
 
 // Middleware
-app.use(cors({ origin: ["http://localhost:5173"], credentials: true }));
+app.use(
+  cors({ origin: ["https://dish-palate.vercel.app"], credentials: true })
+);
 app.use(express.json());
 
 // ! verify jwt
@@ -49,7 +51,6 @@ async function run() {
     //! User Registration
     app.post("/api/v1/user", async (req, res) => {
       const { displayName, photoUrl, email, coin } = req.body;
-      console.log(req.body);
 
       // check if email already exists
       const existingUser = await usersCollection.findOne({ email });
@@ -72,7 +73,6 @@ async function run() {
     // ! jwt
     app.post("/api/v1/jwt", async (req, res) => {
       const body = req.body;
-      console.log(body);
       const token = jwt.sign(body, process.env.ACCESS_TOKEN, {
         expiresIn: "1h",
       });
@@ -137,7 +137,7 @@ async function run() {
     });
 
     //! recipe get and filtering and search
-    app.get("/api/v1/recipes", verifyJWT, async (req, res) => {
+    app.get("/api/v1/recipes", async (req, res) => {
       const { category, country, search } = req.query;
       let query = {};
 
@@ -168,7 +168,7 @@ async function run() {
     });
 
     //! get single recipe data
-    app.get("/api/v1/recipes/:id", verifyJWT, async (req, res) => {
+    app.get("/api/v1/recipes/:id", async (req, res) => {
       const { id } = req.params;
 
       try {
@@ -196,10 +196,8 @@ async function run() {
     });
 
     //! Coin buy endpoint and update coin
-    app.patch("/api/v1/coin", verifyJWT, async (req, res) => {
-      console.log(req.body);
+    app.patch("/api/v1/coin", async (req, res) => {
       const { userEmail, boughtCoins } = req.body;
-      console.log(userEmail);
 
       try {
         const user = await usersCollection.findOne({ email: userEmail });
@@ -229,7 +227,6 @@ async function run() {
 
     //! coin update after successful recipe view
     app.patch("/api/v1/recipe-update", async (req, res) => {
-      console.log(req.body);
       const { userEmail, recipeId } = req.body;
 
       try {
@@ -246,7 +243,6 @@ async function run() {
         const recipe = await recipesCollection.findOne({
           _id: ObjectId.createFromHexString(recipeId),
         });
-        console.log("user", recipe);
         if (!recipe) {
           return res.status(404).json({
             success: false,
@@ -292,8 +288,8 @@ async function run() {
     });
 
     //! reaction add/remove api
-    app.patch("/api/v1/recipes/:id/reaction", async (req, res) => {
-      const { id } = req.params;
+    app.patch("/api/v1/recipes/reaction", async (req, res) => {
+      const { id } = req.body;
       const { userEmail } = req.body;
 
       try {
